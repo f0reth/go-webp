@@ -1,40 +1,67 @@
-## webp
-[![Status](https://github.com/gen2brain/webp/actions/workflows/test.yml/badge.svg)](https://github.com/gen2brain/webp/actions)
-[![Go Reference](https://pkg.go.dev/badge/github.com/gen2brain/webp.svg)](https://pkg.go.dev/github.com/gen2brain/webp)
+# go-webp
 
-Go encoder/decoder for [WebP Image File Format](https://en.wikipedia.org/wiki/WebP) with support for animated WebP images (decode only).
+## 実行に必要なファイル
 
-Based on [libwebp](https://github.com/webmproject/libwebp) compiled to [WASM](https://en.wikipedia.org/wiki/WebAssembly) and used with [wazero](https://wazero.io/) runtime (CGo-free).
+このライブラリは [purego](https://github.com/ebitengine/purego) を使って libwebp の共有ライブラリを動的に読み込みます。事前に以下のファイルをインストールしてください。
 
-The library will first try to use a dynamic/shared library (if installed) via [purego](https://github.com/ebitengine/purego) and will fall back to WASM.
+| OS | 必要なファイル |
+|---|---|
+| Windows | `libwebp.dll`、`libwebpdemux.dll` |
+| Linux | `libwebp.so`、`libwebpdemux.so` |
+| macOS | `libwebp.dylib`、`libwebpdemux.dylib` |
 
-### Build tags
+## 使い方
 
-* `nodynamic` - do not use dynamic/shared library (use only WASM)
+### インポート
 
-### Benchmark
-
-```
-goos: linux
-goarch: amd64
-pkg: github.com/gen2brain/webp
-cpu: 11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz
-
-BenchmarkDecodeStd-8                             157	   7639585 ns/op	  473683 B/op	      13 allocs/op
-BenchmarkDecodeWasm-8                            156	   7799653 ns/op	 2614793 B/op	     316 allocs/op
-BenchmarkDecodeDynamic-8                         344	   3497863 ns/op	  943356 B/op	      58 allocs/op
-BenchmarkDecodeTranspiled-8 (1)                  138	   8562133 ns/op	 1335622 B/op	      52 allocs/op
-BenchmarkDecodeCGo1-8 (2)                        300	   3897300 ns/op	 1333630 B/op	      21 allocs/op
-BenchmarkDecodeCGo2-8 (3)                        314	   3801195 ns/op	 1334020 B/op	      22 allocs/op
-
-BenchmarkEncodeWasm-8                             12	  96123599 ns/op	 4857356 B/op	     298 allocs/op
-BenchmarkEncodeDynamic-8                          55	  19022243 ns/op	   19888 B/op	      42 allocs/op
-BenchmarkEncodeTranspiled-8 (1)                   18	  60042805 ns/op	   76104 B/op	      36 allocs/op
-BenchmarkEncodeCGo1-8 (2)                         31	  32538122 ns/op	 3213497 B/op	  524294 allocs/op
-BenchmarkEncodeCGo2-8 (3)                         52	  22482704 ns/op	   26043 B/op	       5 allocs/op
+```go
+import "github.com/f0reth/go-webp"
 ```
 
-- `(1)` [git.sr.ht/~jackmordaunt/go-libwebp](https://git.sr.ht/~jackmordaunt/go-libwebp)
-- `(2)` [github.com/chai2010/webp](https://github.com/chai2010/webp)
-- `(3)` [github.com/kolesa-team/go-webp](https://github.com/kolesa-team/go-webp)
+### デコード（WebP → image.Image）
 
+```go
+f, _ := os.Open("input.webp")
+defer f.Close()
+
+img, err := webp.Decode(f)
+```
+
+### アニメーション WebP のデコード
+
+```go
+f, _ := os.Open("anim.webp")
+defer f.Close()
+
+ret, err := webp.DecodeAll(f)
+// ret.Image: 各フレームの画像スライス
+// ret.Delay: 各フレームの表示時間（ミリ秒）
+```
+
+### エンコード（image.Image → WebP）
+
+```go
+f, _ := os.Create("output.webp")
+defer f.Close()
+
+err := webp.Encode(f, img)
+```
+
+### エンコードオプション
+
+```go
+err := webp.Encode(f, img, webp.Options{
+    Quality:  90,      // 画質 0〜100（デフォルト: 75）
+    Lossless: false,   // true にすると可逆圧縮（Quality は無視）
+    Method:   4,       // エンコード速度 0（速い）〜6（高品質、デフォルト: 4）
+    Exact:    false,   // true にすると透明部分の RGB 値を保持
+})
+```
+
+### ライブラリの読み込み確認
+
+```go
+if err := webp.Dynamic(); err != nil {
+    log.Fatal("共有ライブラリが見つかりません:", err)
+}
+```
