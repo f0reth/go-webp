@@ -194,7 +194,7 @@ func TestEncode(t *testing.T) {
 func BenchmarkDecode(b *testing.B) {
 	skipIfNoLibrary(b)
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _, err := decode(bytes.NewReader(testWebp), false, false)
 		if err != nil {
 			b.Error(err)
@@ -210,7 +210,7 @@ func BenchmarkEncode(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		err = encode(io.Discard, img, DefaultQuality, DefaultMethod, false, false)
 		if err != nil {
 			b.Error(err)
