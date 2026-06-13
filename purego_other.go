@@ -1,4 +1,4 @@
-//go:build (!unix && !darwin && !windows) || nodynamic
+//go:build !unix && !darwin && !windows
 
 package webp
 
@@ -10,14 +10,14 @@ import (
 
 var (
 	dynamic    = false
-	dynamicErr = fmt.Errorf("webp: dynamic disabled")
+	dynamicErr = fmt.Errorf("webp: platform not supported")
 )
 
-func decodeDynamic(r io.Reader, configOnly, decodeAll bool) (*WEBP, image.Config, error) {
+func decode(r io.Reader, configOnly, decodeAll bool) (*WEBP, image.Config, error) {
 	return nil, image.Config{}, dynamicErr
 }
 
-func encodeDynamic(w io.Writer, m image.Image, quality, method int, lossless, exact bool) error {
+func encode(w io.Writer, m image.Image, quality, method int, lossless, exact bool) error {
 	return dynamicErr
 }
 

@@ -1,4 +1,4 @@
-//go:build (unix || darwin || windows) && !nodynamic
+//go:build unix || darwin || windows
 
 package webp
 
@@ -13,7 +13,7 @@ import (
 	"github.com/ebitengine/purego"
 )
 
-func decodeDynamic(r io.Reader, configOnly, decodeAll bool) (*WEBP, image.Config, error) {
+func decode(r io.Reader, configOnly, decodeAll bool) (*WEBP, image.Config, error) {
 	var cfg image.Config
 
 	var err error
@@ -132,7 +132,7 @@ func decodeDynamic(r io.Reader, configOnly, decodeAll bool) (*WEBP, image.Config
 	return ret, cfg, nil
 }
 
-func encodeDynamic(w io.Writer, m image.Image, quality, method int, lossless, exact bool) error {
+func encode(w io.Writer, m image.Image, quality, method int, lossless, exact bool) error {
 	var config webpConfig
 	if !webpConfigInit(&config) {
 		return ErrEncode

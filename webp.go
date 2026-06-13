@@ -1,4 +1,5 @@
-// Package webp implements an WEBP image decoder based on libwebp compiled to WASM.
+// Package webp implements a WEBP image decoder/encoder based on libwebp/libwebpdemux
+// shared libraries used via purego (CGo-free).
 package webp
 
 import (
@@ -51,19 +52,13 @@ type Options struct {
 
 // Decode reads a WEBP image from r and returns it as an image.Image.
 func Decode(r io.Reader) (image.Image, error) {
-	var err error
-	var ret *WEBP
+	if !dynamic {
+		return nil, dynamicErr
+	}
 
-	if dynamic {
-		ret, _, err = decodeDynamic(r, false, false)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		ret, _, err = decode(r, false, false)
-		if err != nil {
-			return nil, err
-		}
+	ret, _, err := decode(r, false, false)
+	if err != nil {
+		return nil, err
 	}
 
 	return ret.Image[0], nil
@@ -71,19 +66,13 @@ func Decode(r io.Reader) (image.Image, error) {
 
 // DecodeConfig returns the color model and dimensions of a WEBP image without decoding the entire image.
 func DecodeConfig(r io.Reader) (image.Config, error) {
-	var err error
-	var cfg image.Config
+	if !dynamic {
+		return image.Config{}, dynamicErr
+	}
 
-	if dynamic {
-		_, cfg, err = decodeDynamic(r, true, false)
-		if err != nil {
-			return image.Config{}, err
-		}
-	} else {
-		_, cfg, err = decode(r, true, false)
-		if err != nil {
-			return image.Config{}, err
-		}
+	_, cfg, err := decode(r, true, false)
+	if err != nil {
+		return image.Config{}, err
 	}
 
 	return cfg, nil
@@ -91,19 +80,13 @@ func DecodeConfig(r io.Reader) (image.Config, error) {
 
 // DecodeAll reads a WEBP image from r and returns the sequential frames and timing information.
 func DecodeAll(r io.Reader) (*WEBP, error) {
-	var err error
-	var ret *WEBP
+	if !dynamic {
+		return nil, dynamicErr
+	}
 
-	if dynamic {
-		ret, _, err = decodeDynamic(r, false, true)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		ret, _, err = decode(r, false, true)
-		if err != nil {
-			return nil, err
-		}
+	ret, _, err := decode(r, false, true)
+	if err != nil {
+		return nil, err
 	}
 
 	return ret, nil
@@ -136,19 +119,11 @@ func Encode(w io.Writer, m image.Image, o ...Options) error {
 		}
 	}
 
-	if dynamic {
-		err := encodeDynamic(w, m, quality, method, lossless, exact)
-		if err != nil {
-			return err
-		}
-	} else {
-		err := encode(w, m, quality, method, lossless, exact)
-		if err != nil {
-			return err
-		}
+	if !dynamic {
+		return dynamicErr
 	}
 
-	return nil
+	return encode(w, m, quality, method, lossless, exact)
 }
 
 // Dynamic returns error (if there was any) during opening dynamic/shared library.
@@ -156,16 +131,10 @@ func Dynamic() error {
 	return dynamicErr
 }
 
-// Init initializes wazero runtime and compiles the module.
-// This function does nothing if a dynamic/shared library is used and Dynamic() returns nil.
-// There is no need to explicitly call this function, first Decode/Encode will initialize the runtime.
-func Init() {
-	if dynamic && dynamicErr == nil {
-		return
-	}
-
-	initOnce()
-}
+// Init is kept for backward compatibility and does nothing.
+// The dynamic/shared library is loaded during package initialization;
+// use Dynamic to check whether loading succeeded.
+func Init() {}
 
 func imageToNRGBA(src image.Image) *image.NRGBA {
 	if dst, ok := src.(*image.NRGBA); ok {

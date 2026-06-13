@@ -9,7 +9,6 @@ import (
 	"image/png"
 	"io"
 	"os"
-	"sync"
 	"testing"
 )
 
@@ -22,24 +21,16 @@ var testPng []byte
 //go:embed testdata/anim.webp
 var testWebpAnim []byte
 
-func TestDecode(t *testing.T) {
-	img, err := Decode(bytes.NewReader(testWebp))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	w, err := writeCloser()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = jpeg.Encode(w, img, nil)
-	if err != nil {
-		t.Error(err)
+func skipIfNoLibrary(tb testing.TB) {
+	if err := Dynamic(); err != nil {
+		fmt.Println(err)
+		tb.Skip()
 	}
 }
 
-func TestDecodeWasm(t *testing.T) {
+func TestDecode(t *testing.T) {
+	skipIfNoLibrary(t)
+
 	img, _, err := decode(bytes.NewReader(testWebp), false, false)
 	if err != nil {
 		t.Fatal(err)
@@ -56,29 +47,9 @@ func TestDecodeWasm(t *testing.T) {
 	}
 }
 
-func TestDecodeDynamic(t *testing.T) {
-	if err := Dynamic(); err != nil {
-		fmt.Println(err)
-		t.Skip()
-	}
+func TestDecodeAnim(t *testing.T) {
+	skipIfNoLibrary(t)
 
-	img, _, err := decodeDynamic(bytes.NewReader(testWebp), false, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	w, err := writeCloser()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = jpeg.Encode(w, img.Image[0], nil)
-	if err != nil {
-		t.Error(err)
-	}
-}
-
-func TestDecodeAnimWasm(t *testing.T) {
 	ret, _, err := decode(bytes.NewReader(testWebpAnim), false, true)
 	if err != nil {
 		t.Fatal(err)
@@ -110,44 +81,9 @@ func TestDecodeAnimWasm(t *testing.T) {
 	}
 }
 
-func TestDecodeAnimDynamic(t *testing.T) {
-	if err := Dynamic(); err != nil {
-		fmt.Println(err)
-		t.Skip()
-	}
-
-	ret, _, err := decodeDynamic(bytes.NewReader(testWebpAnim), false, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(ret.Image) != len(ret.Delay) {
-		t.Errorf("got %d, want %d", len(ret.Delay), len(ret.Image))
-	}
-
-	if len(ret.Image) != 17 {
-		t.Errorf("got %d, want %d", len(ret.Image), 17)
-	}
-
-	for _, img := range ret.Image {
-		w, err := writeCloser()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = jpeg.Encode(w, img, nil)
-		if err != nil {
-			t.Error(err)
-		}
-
-		err = w.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
 func TestImageDecode(t *testing.T) {
+	skipIfNoLibrary(t)
+
 	img, _, err := image.Decode(bytes.NewReader(testWebp))
 	if err != nil {
 		t.Fatal(err)
@@ -165,6 +101,8 @@ func TestImageDecode(t *testing.T) {
 }
 
 func TestImageDecodeAnim(t *testing.T) {
+	skipIfNoLibrary(t)
+
 	img, _, err := image.Decode(bytes.NewReader(testWebpAnim))
 	if err != nil {
 		t.Fatal(err)
@@ -182,6 +120,8 @@ func TestImageDecodeAnim(t *testing.T) {
 }
 
 func TestDecodeConfig(t *testing.T) {
+	skipIfNoLibrary(t)
+
 	cfg, err := DecodeConfig(bytes.NewReader(testWebp))
 	if err != nil {
 		t.Fatal(err)
@@ -197,6 +137,8 @@ func TestDecodeConfig(t *testing.T) {
 }
 
 func TestImageDecodeConfig(t *testing.T) {
+	skipIfNoLibrary(t)
+
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(testWebp))
 	if err != nil {
 		t.Fatal(err)
@@ -212,6 +154,8 @@ func TestImageDecodeConfig(t *testing.T) {
 }
 
 func TestEncodeRGBA(t *testing.T) {
+	skipIfNoLibrary(t)
+
 	img, err := png.Decode(bytes.NewReader(testPng))
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +172,9 @@ func TestEncodeRGBA(t *testing.T) {
 	}
 }
 
-func TestEncodeWasm(t *testing.T) {
+func TestEncode(t *testing.T) {
+	skipIfNoLibrary(t)
+
 	img, err := Decode(bytes.NewReader(testWebp))
 	if err != nil {
 		t.Fatal(err)
@@ -245,54 +191,9 @@ func TestEncodeWasm(t *testing.T) {
 	}
 }
 
-func TestEncodeWasmSync(t *testing.T) {
-	wg := sync.WaitGroup{}
-	ch := make(chan bool, 2)
+func BenchmarkDecode(b *testing.B) {
+	skipIfNoLibrary(b)
 
-	img, err := Decode(bytes.NewReader(testWebp))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			ch <- true
-			defer func() { <-ch; wg.Done() }()
-
-			err = encode(io.Discard, img, DefaultQuality, DefaultMethod, false, false)
-			if err != nil {
-				t.Error(err)
-			}
-		}()
-	}
-
-	wg.Wait()
-}
-
-func TestEncodeDynamic(t *testing.T) {
-	if err := Dynamic(); err != nil {
-		fmt.Println(err)
-		t.Skip()
-	}
-
-	img, err := Decode(bytes.NewReader(testWebp))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	w, err := writeCloser()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = encodeDynamic(w, img, DefaultQuality, DefaultMethod, false, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func BenchmarkDecodeWasm(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, _, err := decode(bytes.NewReader(testWebp), false, false)
 		if err != nil {
@@ -301,21 +202,9 @@ func BenchmarkDecodeWasm(b *testing.B) {
 	}
 }
 
-func BenchmarkDecodeDynamic(b *testing.B) {
-	if err := Dynamic(); err != nil {
-		fmt.Println(err)
-		b.Skip()
-	}
+func BenchmarkEncode(b *testing.B) {
+	skipIfNoLibrary(b)
 
-	for i := 0; i < b.N; i++ {
-		_, _, err := decodeDynamic(bytes.NewReader(testWebp), false, false)
-		if err != nil {
-			b.Error(err)
-		}
-	}
-}
-
-func BenchmarkEncodeWasm(b *testing.B) {
 	img, err := Decode(bytes.NewReader(testWebp))
 	if err != nil {
 		b.Fatal(err)
@@ -323,25 +212,6 @@ func BenchmarkEncodeWasm(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		err = encode(io.Discard, img, DefaultQuality, DefaultMethod, false, false)
-		if err != nil {
-			b.Error(err)
-		}
-	}
-}
-
-func BenchmarkEncodeDynamic(b *testing.B) {
-	if err := Dynamic(); err != nil {
-		fmt.Println(err)
-		b.Skip()
-	}
-
-	img, err := Decode(bytes.NewReader(testWebp))
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	for i := 0; i < b.N; i++ {
-		err = encodeDynamic(io.Discard, img, DefaultQuality, DefaultMethod, false, false)
 		if err != nil {
 			b.Error(err)
 		}
